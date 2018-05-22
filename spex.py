@@ -206,38 +206,39 @@ def fl2mag(fl, mzero=20):
 
 ######################################################################################
 
-def generate_header(out):
+def generate_header(fname):
     link = 'https://ui.adsabs.harvard.edu/#abs/2016ApJS..227...29P'
 
-    out.write('SURVEY: LSST\n')
-    out.write('FILTERS: ugrizY\n')
-    out.write('MODEL: PHOEBE\n')
-    out.write('MODEL_PARNAMES: PERIOD,TRAT,RSUM,ECOSW,ESINW,COSI,Q,FF\n')
-    # out.write('NEVENT: N/A\n')
-    out.write('RECUR_CLASS: RECUR-PERIODIC\n')
-    out.write('\n')
-    out.write('COMMENT: Created on %s by Andrej Prsa\n' % (dt.date.today()))
-    out.write('COMMENT: PHOEBE stands for PHysics Of Eclipsing BinariEs\n')
-    out.write('COMMENT: See %s\n' % (link))
-    out.write('COMMENT: PERIOD is the orbital period, in days\n')
-    out.write('COMMENT: TRAT   is the temperature ratio, T2/T1\n')
-    out.write('COMMENT: RSUM   is the sum of fractional radii, (R1+R2)/a\n')
-    out.write('COMMENT: ECOSW  is tangential eccentricity, e*cos(w)\n')
-    out.write('COMMENT: ESINW  is radial eccentricity, e*sin(w)\n')
-    out.write('COMMENT: COSI   is the cosine of inclination\n')
-    out.write('COMMENT: Q      is the mass ratio, M2/M1\n')
-    out.write('COMMENT: FF     is the fillout factor, (pot-potL1)/(potL2-potL1)\n')
-    out.write('\n')
+    with open(fname, 'w') as out:
+        out.write('SURVEY: LSST\n')
+        out.write('FILTERS: ugrizY\n')
+        out.write('MODEL: PHOEBE\n')
+        out.write('MODEL_PARNAMES: PERIOD,TRAT,RSUM,ECOSW,ESINW,COSI,Q,FF\n')
+        # out.write('NEVENT: N/A\n')
+        out.write('RECUR_CLASS: RECUR-PERIODIC\n')
+        out.write('\n')
+        out.write('COMMENT: Created on %s by Andrej Prsa\n' % (dt.date.today()))
+        out.write('COMMENT: PHOEBE stands for PHysics Of Eclipsing BinariEs\n')
+        out.write('COMMENT: See %s\n' % (link))
+        out.write('COMMENT: PERIOD is the orbital period, in days\n')
+        out.write('COMMENT: TRAT   is the temperature ratio, T2/T1\n')
+        out.write('COMMENT: RSUM   is the sum of fractional radii, (R1+R2)/a\n')
+        out.write('COMMENT: ECOSW  is tangential eccentricity, e*cos(w)\n')
+        out.write('COMMENT: ESINW  is radial eccentricity, e*sin(w)\n')
+        out.write('COMMENT: COSI   is the cosine of inclination\n')
+        out.write('COMMENT: Q      is the mass ratio, M2/M1\n')
+        out.write('COMMENT: FF     is the fillout factor, (pot-potL1)/(potL2-potL1)\n')
+        out.write('\n')
 
-def generate_event(out, data, pars, glon=0.0, glat=0.0):
-    out.write('START_EVENT: 1\n')
-    out.write('NROW: %d GLON: %f GLAT: %f\n' % (len(data), glon, glat))
-    out.write('PARVAL: %f,%f,%f,%f,%f,%f,%f,%f\n' % (pars[0], pars[1], pars[2], pars[3], pars[4], pars[5], pars[6], pars[7]))
-    # out.write('ANGLEMATCH: 10.0 # optional\n')
-    for d in data:
-        out.write('S: %7.4f %.3f %.3f %.3f %.3f %.3f %.3f\n' % (d[0], d[1], d[2], d[3], d[4], d[5], d[6]))
-    out.write('END_EVENT: 1\n')
-
+def generate_event(fname, data, index, pars, glon=0.0, glat=0.0):
+    with open(fname, 'a') as out:
+        out.write('START_EVENT: %d\n' % index)
+        out.write('NROW: %d GLON: %f GLAT: %f\n' % (len(data), glon, glat))
+        out.write('PARVAL: %f,%f,%f,%f,%f,%f,%f,%f\n' % (pars[0], pars[1], pars[2], pars[3], pars[4], pars[5], pars[6], pars[7]))
+        out.write('ANGLEMATCH_b: 10.0\n')
+        for d in data:
+            out.write('S: %7.4f %.3f %.3f %.3f %.3f %.3f %.3f\n' % (d[0], d[1], d[2], d[3], d[4], d[5], d[6]))
+        out.write('END_EVENT: %d\n' % index)
 
 ######################################################################################
 
@@ -422,8 +423,9 @@ class Binary:
         self.F1      = 1.0
         self.F2      = 1.0
 
-        # A PHOEBE bundle placeholder
+        # A PHOEBE bundle placeholder for detached and contact binary
         self.b = None
+        self.cb = None
 
         self.physical = False
         safety_counter = 0
@@ -576,7 +578,7 @@ class Binary:
         # Do we have just a single eclipse?
         self.SEB = (supEB != infEB)
 
-    def compute_lc(self, filename):
+    def compute_lc(self, filename, index):
         if self.b == None:
             self.times = np.linspace(0, self.period, 201)
             self.b = phoebe.default_binary()
@@ -595,6 +597,25 @@ class Binary:
             self.b.set_value_all('atm',       'blackbody')
             self.b.set_value_all('ld_func',   'linear')
             self.b.set_value_all('ld_coeffs', [0.5])
+
+        # if self.cb == None:
+        #     self.times = np.linspace(0, self.period, 201)
+        #     self.cb = phoebe.default_binary(contact_binary=True)
+        #     self.cb.flip_constraint('pot@primary', solve_for='rpole')
+        #     self.cb.flip_constraint('pot@secondary', solve_for='rpole')
+
+        #     self.cb.add_dataset('lc', dataset='u', times=self.times, passband='LSST:u')
+        #     self.cb.add_dataset('lc', dataset='g', times=self.times, passband='LSST:g')
+        #     self.cb.add_dataset('lc', dataset='r', times=self.times, passband='LSST:r')
+        #     self.cb.add_dataset('lc', dataset='i', times=self.times, passband='LSST:i')
+        #     self.cb.add_dataset('lc', dataset='z', times=self.times, passband='LSST:z')
+        #     self.cb.add_dataset('lc', dataset='y', times=self.times, passband='LSST:y')
+
+        #     self.cb.add_dataset('mesh', columns=['abs_normal_intensities@*', 'areas', 'volume', 'ldint@*', 'ptfarea@*'])
+
+        #     self.cb.set_value_all('atm',       'blackbody')
+        #     self.cb.set_value_all('ld_func',   'linear')
+        #     self.cb.set_value_all('ld_coeffs', [0.5])
 
         self.b['t0@system'] = self.meanan
         self.b['period@orbit'] = self.period
@@ -624,9 +645,7 @@ class Binary:
         data = np.stack((self.times, fl2mag(self.b['value@fluxes@u@model'], mzero), fl2mag(self.b['value@fluxes@g@model'], mzero), fl2mag(self.b['value@fluxes@r@model'], mzero), fl2mag(self.b['value@fluxes@i@model'], mzero), fl2mag(self.b['value@fluxes@z@model'], mzero), fl2mag(self.b['value@fluxes@y@model'], mzero)), axis=-1)
         pars = [self.period, self.teff2/self.teff1, self.r1+self.r2, self.ecc*np.cos(self.per0), self.ecc*np.sin(self.per0), self.cosi, self.q, self.FF]
 
-        with open(filename, 'w') as mylc:
-            generate_header(mylc)
-            generate_event(mylc, data, pars, self.glon, self.glat)
+        generate_event(filename, data, index, pars, self.glon, self.glat)
 
     def __repr__(self):
         return "%10.5f %10.5f %10.5f %10.5f %10.5f %10.5f %10.5f %10.5f %10.5f %11.5f %5.1f  %d  %d" % (self.glon, self.glat, self.period, self.ecc, self.per0, self.cosi, self.sma, self.mag, self.distance, self.Teff, self.age, self.EB, self.SEB)
@@ -1056,7 +1075,7 @@ if __name__=='__main__':
     parser.add_argument(      '--maxEBs',       metavar='num',        help='stop when the passed number of EBs has been created\
                                                                             (default: no limit)',                                      type=int,   default=-1)
     parser.add_argument(      '--sample-size',  metavar='num',        help='number of objects to be generated (default: 200000)',      type=int,   default=200000)
-    parser.add_argument(      '--output-dir',   metavar='file',       help='directory to store generated light curves (default: lcs)', type=str,   default='lcs')
+    parser.add_argument(      '--output-file',  metavar='file',       help='file to store generated light curves (default: EBs.cat)',  type=str,   default='EBs.cat')
     parser.add_argument(      '--on-silicon',   action='store_true',  help='generate only targets on silicon (default: False)')
     argv = parser.parse_args()
 
@@ -1091,6 +1110,8 @@ if __name__=='__main__':
 
         print('# Number of binaries to be generated: %d' % (Bnum))
 
+        generate_header(argv.output_file)
+
         total_EBs = 0
         total_SEBs = 0
         for i in range(Bnum):
@@ -1101,7 +1122,7 @@ if __name__=='__main__':
             print(b, ' %2.2f%%' % ((float(i)+1)/Bnum*100))
 
             if b.EB:
-                b.compute_lc(filename='%s/eb%04d.lc' % (argv.output_dir, total_EBs))
+                b.compute_lc(filename=argv.output_file, index=total_EBs)
 
             if total_EBs == argv.maxEBs:
                 break
